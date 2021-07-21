@@ -397,19 +397,8 @@ class EndPointsCxg(EndPoints):
 
     @classmethod
     def setUpClass(cls):
-        cls.app_config = AppConfig()
-        cls.app_config.update_server_config(
-            multi_dataset__dataroot=FIXTURES_ROOT,
-            authentication__type="test",
-            authentication__insecure_test_environment=True,
-            app__flask_secret_key="testing",
-            app__debug=True
-        )
-        cls.app_config.update_default_dataset_config(
-            embeddings__enable_reembedding=True,
-            user_annotations__enable=False,
-        )
-        super().setUpClass(cls.app_config)
+        app_config = AppConfig()
+        app_config.update_default_dataset_config(user_annotations__enable=False)
 
 
     def test_get_genesets_json(self):
