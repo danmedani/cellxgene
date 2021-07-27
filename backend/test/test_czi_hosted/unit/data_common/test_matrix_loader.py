@@ -34,7 +34,7 @@ class MatrixCacheTest(unittest.TestCase):
             pass
 
     def get_datasets(self, matrix_cache, dirname):
-        datasets = matrix_cache.datasets
+        datasets = matrix_cache.data
         result = {}
         for k, v in datasets.items():
             # filter out the dirname and the .cxg from the name

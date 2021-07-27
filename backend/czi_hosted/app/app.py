@@ -109,7 +109,7 @@ def dataset_index(url_dataroot=None, dataset=None):
 def handle_request_exception(error):
     return common_rest.abort_and_log(error.status_code, error.message, loglevel=logging.INFO, include_exc_info=True)
 
-def get_data_path(config, ):
+# def get_data_path(config, ):
 
 def get_data_adaptor(url_dataroot=None, dataset=None):
     config = current_app.app_config
@@ -148,7 +148,7 @@ It also spreads the logic of detering the S3 path across two separate modules
 indirection via the poral). Super likely this will be a source of future bugs IMHO.
 
 Here is an alternative approach that (I think) solves both:
-
+key value lru , getter, setter, both update timestamp associated with key. with a garbage collector 
 do caching based on the dataset value
 add a new function which, given a dataset, returns two values: 
 the explorer path (ie, join(dataroot, datapath), 
