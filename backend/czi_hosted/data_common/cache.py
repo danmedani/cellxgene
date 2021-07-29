@@ -1,58 +1,53 @@
-from abc import ABC, abstractmethod
 import threading
 import time
+from collections import Callable
+from typing import Optional
 
+import typing
 
-from backend.common.errors import DatasetAccessError
+from backend.common.errors import DatasetAccessError, DatasetNotFoundException
 from contextlib import contextmanager
 
 from backend.czi_hosted.data_common.rwlock import RWLock
 
 
-class CacheItem(ABC):
-    """This class provides an abstract base class for caching information.  The first time information is accessed,
+class CacheItem(object):
+    """This class provides a base class for caching information.  The first time information is accessed,
     it is located and cached.  Later accesses use the cached version.   It may also be deleted by the
     DataCacheManager to make room.  While data is actively being used (during the lifetime of an api request),
     a reader lock is locked.  During that time, the data cannot be removed or updated."""
 
-    def __init__(self, loader):
-        self.loader = loader
+    def __init__(self):
+        # self.loader = loader
         self.data_lock = RWLock()
-        self.data_adaptor = None
+        self.data = None
 
-    def acquire_existing(self):
-        """If the data exists, take a read lock and return it, else return None"""
+
+    def get(self, cache_key: str, create_data_lambda: typing.Optional[typing.Callable[[str], object]] = None, create_data_args: object = {}):
         self.data_lock.r_acquire()
-        if self.data_adaptor:
-            return self.data_adaptor
-
+        if self.data:
+            return self.data
         self.data_lock.r_release()
-        return None
-
-    def acquire_and_open(self, app_config, dataset_config=None):
-        """returns the data_adaptor if cached.  opens the data_adaptor if not.
-        In either case, the a reader lock is taken.  Must call release when
-        the data_adaptor is no longer needed"""
-        self.data_lock.r_acquire()
-        if self.data_adaptor:
-            return self.data_adaptor
-        self.data_lock.r_release()
+        if create_data_lambda is None:
+            return None
 
         self.data_lock.w_acquire()
         # the data may have been loaded while waiting on the lock
-        if not self.data_adaptor:
+        if not self.data:
             try:
-                self.loader.pre_load_validation()
-                self.data_adaptor = self.loader.open(app_config, dataset_config)
-            except Exception as e:
+                # self.data = self.loader.
+                import pdb
+                pdb.set_trace()
+                self.data = create_data_lambda(cache_key, **create_data_args)  # rename create_data
+            except:
                 # necessary to hold the reader lock after an exception, since
                 # the release will occur when the context exits.
                 self.data_lock.w_demote()
-                raise DatasetAccessError(str(e))
+                raise
 
         # demote the write lock to a read lock.
         self.data_lock.w_demote()
-        return self.data_adaptor
+        return self.data
 
     def release(self):
         """Release the reader lock"""
@@ -61,17 +56,22 @@ class CacheItem(ABC):
     def delete(self):
         """Clear resources used by this cache item"""
         with self.data_lock.w_locked():
-            if self.data_adaptor:
-                self.data_adaptor.cleanup()
-                self.data_adaptor = None
+            if self.data:
+                try:
+                    self.data.cleanup()
+                except AttributeError:
+                    pass
+                self.data = None
 
     def attempt_delete(self):
         """Delete, but only if the write lock can be immediately locked.  Return True if the delete happened"""
         if self.data_lock.w_acquire_non_blocking():
-            if self.data_adaptor:
+            if self.data:
                 try:
-                    self.data_adaptor.cleanup()
-                    self.data_adaptor = None
+                    self.data.cleanup()
+                    self.data = None
+                except AttributeError:
+                    self.data = None
                 except Exception:
                     # catch all exceptions to ensure the lock is released
                     pass
@@ -91,9 +91,12 @@ class CacheItemInfo(object):
         # The number of times the cache_item was accessed (used for testing)
         self.num_access = 1
 
+    def update_latest_cache_access(self):
+        self.last_access = time.time()
+        self.num_access +=1
 
-class CacheManager(ABC):
-    """An abstract base class to manage the cached data. This is intended to be used as a context manager
+class CacheManager(object):
+    """An base class to manage cached data. This is intended to be used as a context manager
     for handling api requests.  When the context is created, the data_adaptor is either loaded or
     retrieved from a cache.  In either case, the reader lock is taken during this time, and release
     when the context ends.  This class currently implements a simple least recently used cache,
@@ -114,8 +117,7 @@ class CacheManager(ABC):
     # then the cache will not react to this, however once the cache time limit is reached, the dataset
     # will automatically be refreshed.
 
-    def __init__(self, max_cached, timelimit_s=None):
-        # key is tuple(url_dataroot, location), value is a DataCacheInfo object
+    def __init__(self, max_cached: int, timelimit_s: int=None):
         self.data = {}
 
         # lock to protect the datasets
@@ -131,59 +133,46 @@ class CacheManager(ABC):
         self.timelimit_s = timelimit_s
 
     @contextmanager
-    def data_adaptor(self, url_dataroot, location, app_config, dataset=None):
+    def data_adaptor(self, cache_key: str, create_data_lambda: Optional[Callable]=None, create_data_args: object={}):
         # create a loader for to this location if it does not already exist
 
         delete_adaptor = None
-        data_adaptor = None
+        desired_data = None
         cache_item = None
 
-        key = (url_dataroot, location)
         with self.lock:
             self.evict_old_data()
-            info = self.data.get(key)
-            if info is not None:
-                info.last_access = time.time()
-                info.num_access += 1
-                self.data[key] = info
-                data_adaptor = info.cache_item.acquire_existing()
-                cache_item = info.cache_item
+            cache_item_info = self.data.get(cache_key)
+            if cache_item_info is not None:
+                cache_item_info.update_latest_cache_access()
+                cache_item = cache_item_info.cache_item
 
-            if data_adaptor is None:
-                # if app_config.server_config.data_locator__api_base and dataset:
-                #     if url_dataroot == "e":  # only pull dataset identification information from the portal for /e/ route
-                #         dataset_identifiers = self.get_dataset_location_from_data_portal(url_dataroot, app_config, dataset)
-                #         if dataset_identifiers and dataset_identifiers['s3_uri'] and dataset_identifiers["tombstoned"] == 'False':
-                #             location = dataset_identifiers["s3_uri"]
-                while True:
-                    if len(self.data) < self.max_cached:
-                        break
-
-                    items = list(self.data.items())
-                    items = sorted(items, key=lambda x: x[1].last_access)
-                    # close the least recently used loader
-                    oldest = items[0]
-                    oldest_cache = oldest[1].cache_item
-                    oldest_key = oldest[0]
-                    del self.data[oldest_key]
-                    delete_adaptor = oldest_cache
-                loader = MatrixDataLoader(location, app_config=app_config)
-                cache_item = MatrixDataCacheItem(loader)
-                item = CacheItemInfo(cache_item, time.time())
-                self.data[key] = item
+            if cache_item is None:
+                delete_adaptor = self.evict_extra_data()
+                # desired_data = info.cache_item.get()
+                # loader = self.data_loader_class(cache_key, app_config=app_config)
+                cache_item = CacheItem()
+                desired_data = cache_item.get(
+                    cache_key=cache_key,
+                    create_data_lambda=create_data_lambda,
+                    create_data_args=create_data_args
+                )
+                cache_item_info = CacheItemInfo(cache_item, time.time())
+                self.data[cache_key] = cache_item_info
 
         try:
             assert cache_item
             if delete_adaptor:
                 delete_adaptor.delete()
-            if data_adaptor is None:
-                dataset_config = app_config.get_dataset_config(url_dataroot)
-                data_adaptor = cache_item.acquire_and_open(app_config, dataset_config)
-            yield data_adaptor
-        except DatasetAccessError:
+            # TODO @mdunitz can this be removed?
+            if desired_data is None:
+                desired_data = cache_item.get(cache_key)
+
+            yield desired_data
+        except (DatasetAccessError, DatasetNotFoundException):
             cache_item.release()
             with self.lock:
-                del self.data[key]
+                del self.data[cache_key]
                 cache_item.delete()
             cache_item = None
             raise
@@ -192,6 +181,21 @@ class CacheManager(ABC):
             if cache_item:
                 cache_item.release()
 
+    def evict_extra_data(self):
+        delete_adaptor = None
+        while True:
+            if len(self.data) < self.max_cached:
+                break
+
+            items = list(self.data.items())
+            items = sorted(items, key=lambda x: x[1].last_access)
+            # close the least recently used loader
+            oldest = items[0]
+            oldest_cache = oldest[1].cache_item
+            oldest_key = oldest[0]
+            del self.data[oldest_key]
+            delete_adaptor = oldest_cache
+        return delete_adaptor
 
     def evict_old_data(self):
         # must be called with the lock held
@@ -211,18 +215,3 @@ class CacheManager(ABC):
             # not be removed.
             if info.cache_item.attempt_delete():
                 del self.data[key]
-
-
-class DataLoader(ABC):
-    @abstractmethod
-    def pre_load_validation(self):
-        pass
-
-    @abstractmethod
-    def open(self):
-        # returns the data adaptor of the data item
-        pass
-
-    @abstractmethod
-    def cleanup(self):
-        pass
