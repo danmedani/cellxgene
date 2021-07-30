@@ -23,6 +23,7 @@ class DiffExpTest(unittest.TestCase):
         extra_dataset_config["X_approximate_distribution"] = "normal"  # hardwired for now
         config = app_config(path, extra_server_config=extra_server_config, extra_dataset_config=extra_dataset_config)
         loader = MatrixDataLoader(path)
+
         adaptor = loader.open(config)
         return adaptor
 
@@ -89,8 +90,6 @@ class DiffExpTest(unittest.TestCase):
 
     def test_cxg_default(self):
         """Test a cxg adaptor with its default diffexp algorithm (diffexp_cxg)"""
-        import pdb
-        pdb.set_trace()
         adaptor = self.load_dataset(f"{FIXTURES_ROOT}/pbmc3k.cxg")
         maskA = self.get_mask(adaptor, 1, 10)
         maskB = self.get_mask(adaptor, 2, 10)

@@ -6,6 +6,7 @@ import requests
 from backend.common.utils.utils import path_join
 from backend.common.errors import DatasetAccessError
 import backend.czi_hosted.common.rest as common_rest
+from backend.czi_hosted.common.config import app_config
 
 
 def get_dataset_metadata_from_data_portal(explorer_url: str):
@@ -34,7 +35,8 @@ def get_dataset_metadata(location: str, **kwargs):
     also used as the cache key) and the explorer web base url (in the app_config)
      return a dataset_metadata object with the dataset storage location available under s3_uri
     """
-    app_config = kwargs["app_config"]
+    # app_config = kwargs["app_config"]
+    app_config
     explorer_url_path = f"{app_config.server_config.get_web_base_url()}/{location}"
     dataset_metadata = get_dataset_metadata_from_data_portal(explorer_url=explorer_url_path)
     if dataset_metadata:

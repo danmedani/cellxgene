@@ -511,7 +511,7 @@ brush_this_gene,,SIK1,\r
 
 class TestDataLocatorMockApi(BaseTest):
     @classmethod
-    @patch('backend.czi_hosted.data_common.matrix_loader.requests.get')
+    @patch('backend.czi_hosted.data_common.dataset_metadata.requests.get')
     @patch('backend.czi_hosted.data_common.matrix_loader.MatrixDataLoader')
     def setUpClass(cls, mock_matrix_loader, mock_get):
         cls.data_locator_api_base = "api.cellxgene.staging.single-cell.czi.technology/dp/v1"
