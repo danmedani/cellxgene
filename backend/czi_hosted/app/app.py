@@ -266,6 +266,8 @@ class ConfigAPI(DatasetResource):
     @cache_control(public=True, max_age=ONE_WEEK)
     @rest_get_data_adaptor
     def get(self, data_adaptor):
+        import pdb
+        pdb.set_trace()
         return common_rest.config_get(current_app.app_config, data_adaptor)
 
 
