@@ -176,7 +176,7 @@ class CacheManager(object):
                 desired_data = cache_item.get(cache_key)
 
             yield desired_data
-        except (DatasetAccessError, DatasetNotFoundException):
+        except (DatasetAccessError, DatasetNotFoundException) as e:
             cache_item.release()
             with self.lock:
                 del self.data[cache_key]

@@ -35,10 +35,10 @@ def get_dataset_metadata(location: str, **kwargs):
     also used as the cache key) and the explorer web base url (in the app_config)
      return a dataset_metadata object with the dataset storage location available under s3_uri
     """
-    # app_config = kwargs["app_config"]
-    app_config
-    explorer_url_path = f"{app_config.server_config.get_web_base_url()}/{location}"
-    dataset_metadata = get_dataset_metadata_from_data_portal(explorer_url=explorer_url_path)
+    app_config = kwargs["app_config"]
+    if app_config:
+        explorer_url_path = f"{app_config.server_config.get_web_base_url()}/{location}"
+        dataset_metadata = get_dataset_metadata_from_data_portal(explorer_url=explorer_url_path)
     if dataset_metadata:
         return dataset_metadata
     server_config = app_config.server_config
@@ -50,18 +50,18 @@ def get_dataset_metadata(location: str, **kwargs):
         "tombstoned": False
     }
     # TODO @mdunitz remove after fork, update config to remove single_dataset option, the multiroot lookup will need to remain while we support covid 19 cell atlas
-    if location is None:
+    if server_config.single_dataset__datapath:
         datapath = server_config.single_dataset__datapath
         dataset_metadata["s3_uri"] = datapath
     else:
-        url_dataroot = location.split("/")[0] # TODO check that this returns dataroot (called on e/dataset_id.cxg not /e/dataset_id.cxg)
-        dataset = location.split("/")[1]
+        location = location.split("/")
+        dataset = location.pop(-1)
+        url_dataroot = "/".join(location) # TODO check that this returns dataroot (called on e/dataset_id.cxg not /e/dataset_id.cxg)
         dataroot = None
         for key, dataroot_dict in server_config.multi_dataset__dataroot.items():
             if dataroot_dict["base_url"] == url_dataroot:
                 dataroot = dataroot_dict["dataroot"]
                 break
-
         if dataroot is None:
             raise DatasetAccessError(f"Invalid dataset {url_dataroot}/{dataset}")
         datapath = path_join(dataroot, dataset)
