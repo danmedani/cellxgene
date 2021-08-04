@@ -139,31 +139,6 @@ def get_data_adaptor(url_dataroot=None, dataset=None):
         )
 
 
-""""
-That still doesn't address the issue of how complex this particular function is and 
-the number of independent routes through it (based on config changes). 
-It also spreads the logic of detering the S3 path across two separate modules 
-(get_data_adaptor() uses dataset to make a physical path, and now data_adaptor() does the same thing with 
-indirection via the poral). Super likely this will be a source of future bugs IMHO.
-
-Here is an alternative approach that (I think) solves both:
-key value lru , getter, setter, both update timestamp associated with key. with a garbage collector 
-do caching based on the dataset value
-add a new function which, given a dataset, returns two values: 
-the explorer path (ie, join(dataroot, datapath), 
-and the S3 dataset location. 
-
-Something like: getDatasetLocation(dataset:str) -> (explorer_path: str, S3_path: str)
-All of the config-driven logic and communication with Portal are in that single function. 
-
-This function could even have its own cache to make things simpler (ie, don't rely on the adaptor cache)
-This new function could be called by either get_data_adaptor or the matrix loader (assuming it has its own cache). It makes the code in matrix_loader.py::data_adaptor() more transparent, ie, you could define it as:
-
-def data_adaptor(self, base_url, explorer_dataset_url, S3_dataset_url)
-
-And all of the config-related branching in data_adaptor() gets removed...."""
-
-
 def requires_authentication(func):
     @wraps(func)
     def wrapped_function(self, *args, **kwargs):

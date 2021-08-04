@@ -166,7 +166,7 @@ class TestDatasetConfig(ConfigTests):
         )
 
         # Change this default to test if the dataroot overrides below work.
-        config.update_default_dataset_config(app__about_legal_tos="tos_default.html")
+        config.update_default_dataset_config(app__about_legal_tos="tos_default.html", user_annotations__enable=False)
 
         # specialize the configs for set1
         config.add_dataroot_config(
