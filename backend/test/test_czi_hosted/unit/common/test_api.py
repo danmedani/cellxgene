@@ -4,7 +4,6 @@ import time
 from http import HTTPStatus
 import hashlib
 from http.client import HTTPException
-from unittest import skip
 from unittest.mock import patch
 
 import requests
@@ -549,8 +548,6 @@ class TestDataLocatorMockApi(BaseTest):
         cls.schema = json.loads(result.data)
 
         cls.assertEqual(mock_get.call_count, 1)
-        import pdb
-        pdb.set_trace()
         cls.assertEqual(mock_get._mock_call_args[1]['url'], f"http://{cls.data_locator_api_base}/datasets/meta?url={cls.config.server_config.get_web_base_url()}{cls.TEST_DATASET_URL_BASE}")
 
 
