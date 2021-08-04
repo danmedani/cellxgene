@@ -61,7 +61,6 @@ class TestExternalConfig(ConfigTests):
         server.testing = True
         session = server.test_client()
 
-        # session = requests.Session()
         response = session.get("/api/v0.2/config")
         data_config = json.loads(response.data)
         self.assertEqual(data_config["config"]["displayNames"]["dataset"], "a95c59b4-7f5d-4b80-ad53-a694834ca18b")

@@ -12,17 +12,20 @@ class MatrixDataType(Enum):
 
 
 class MatrixDataLoader(object):
-    def __init__(self, location, app_config=None):
+    def __init__(self, location, app_config=None, url_dataroot=None, matrix_data_type=None):
         """ location can be a string or DataLocator """
         self.app_config = app_config
+        self.url_dataroot = url_dataroot
         region_name = None if app_config is None else app_config.server_config.data_locator__s3__region_name
         self.location = DataLocator(location, region_name=region_name)
         if not self.location.exists():
             raise DatasetAccessError("Dataset does not exist.", HTTPStatus.NOT_FOUND)
 
+        self.matrix_data_type = matrix_data_type
         # matrix_type is a DataAdaptor type, which corresponds to the matrix_data_type
         self.matrix_type = None
-        self.matrix_data_type = self.__matrix_data_type()
+        if self.matrix_data_type is None:
+            self.matrix_data_type = self.__matrix_data_type()
 
         if not self.__matrix_data_type_allowed(app_config):
             raise DatasetAccessError("Dataset does not have an allowed type.")
@@ -78,6 +81,8 @@ class MatrixDataLoader(object):
 
     def open(self, dataset_config=None):
         # create and return a DataAdaptor object
+        if self.url_dataroot and not dataset_config:
+            self.app_config.get_dataset_config(self.url_dataroot)
         return self.matrix_type.open(self.location, self.app_config, dataset_config)
 
     def validate_and_open(self, dataset_location=None, dataset_config=None, **kwargs):
